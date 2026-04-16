@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.python-version
+
+# Converted NPU models (multi-GB, distribute as release artifacts)
+*.rkllm
+/models/
+/conversion/out/
+
+# Raw HuggingFace weights (multi-GB, download on demand)
+*.safetensors
+*.bin
+*.pth
+*.pt
+
+# Per-machine notes (paths to sibling repos, lab credentials, etc.)
+CLAUDE.local.md
+
+# Build / dist
+/build/
+/dist/
+
+# IDE
+.vscode/
+.idea/
+.DS_Store

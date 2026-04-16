@@ -1,0 +1,156 @@
+name: convert
+# Convert a HuggingFace causal-LM checkpoint to an RK3588-compatible .rkllm
+# file using rkllm-toolkit on a stock GitHub-hosted ubuntu-latest runner
+# (4 vCPU / 16 GB RAM / ~14 GB SSD usable, no GPU).
+#
+# Verified to work for: Qwen/Qwen2.5-0.5B-Instruct (~750 MB output),
+#                       TinyLlama/TinyLlama-1.1B-Chat-v1.0 (~1.1 GB output).
+# Larger models (≳2B params) will need a self-hosted runner or paid larger
+# GitHub runner — RAM is the bottleneck, see docs in conversion/README.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_id:
+        description: HuggingFace repo id, e.g. "Qwen/Qwen2.5-0.5B-Instruct"
+        required: true
+        default: Qwen/Qwen2.5-0.5B-Instruct
+      output_basename:
+        description: 'Basename for the .rkllm artifact (no extension), e.g. "qwen2.5-0.5b-instruct"'
+        required: true
+        default: qwen2.5-0.5b-instruct
+      max_context:
+        description: rkllm max_context (multiple of 32, ≤16384)
+        required: false
+        default: '4096'
+      hf_token:
+        description: 'HuggingFace token (only needed for gated repos like google/gemma-*); leave empty for public models'
+        required: false
+        default: ''
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300  # well under the 6 h GHA hard cap, plenty for 1B models
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free up disk space
+        # Stock ubuntu-latest has ~21 GB free; this frees another ~20 GB by
+        # nuking Android SDK, .NET, Haskell, Docker images, etc. Cheap insurance.
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false  # keep large-packages: false to avoid removing apt deps we may want
+          docker-images: true
+          swap-storage: false
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: conversion/requirements.txt
+
+      - name: Disk + memory baseline
+        run: |
+          df -h /
+          free -h
+          python3 --version
+
+      - name: Install rkllm-toolkit + deps
+        env:
+          # auto_gptq tries to compile a CUDA extension at install time; we
+          # have no CUDA on the runner. Skip the extension; auto_gptq falls
+          # back to a slow python implementation, which is fine because rkllm
+          # only uses it as a model loader for pre-quantized GPTQ inputs (we
+          # convert from raw FP weights).
+          BUILD_CUDA_EXT: '0'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r conversion/requirements.txt
+
+      - name: Pre-download HF model weights
+        env:
+          HF_TOKEN: ${{ inputs.hf_token }}
+        run: |
+          mkdir -p hf-cache
+          # snapshot_download is what convert.py would call; doing it here
+          # in its own step makes the job log easier to read and lets the
+          # Actions cache snapshot the result on retries.
+          python - <<'PY'
+          import os
+          from huggingface_hub import snapshot_download
+          model = "${{ inputs.model_id }}"
+          local = "hf-cache/" + model.replace("/", "__")
+          token = os.environ.get("HF_TOKEN") or None
+          path = snapshot_download(
+              repo_id=model,
+              local_dir=local,
+              token=token,
+              ignore_patterns=["*.gguf", "*.onnx", "*.tflite", "original/*"],
+          )
+          print("downloaded to", path)
+          PY
+          du -sh hf-cache/* || true
+
+      - name: Convert
+        env:
+          # Belt-and-braces — rkllm-toolkit reads CUDA_VISIBLE_DEVICES at
+          # import; convert.py also unsets it when --device cpu is passed.
+          CUDA_VISIBLE_DEVICES: ''
+        run: |
+          mkdir -p out
+          # Re-derive the same path snapshot_download used in the previous step.
+          MODEL_DIR="hf-cache/$(python -c "print('${{ inputs.model_id }}'.replace('/', '__'))")"
+          python conversion/convert.py \
+            --model "$MODEL_DIR" \
+            --output "out/${{ inputs.output_basename }}_w8a8_rk3588.rkllm" \
+            --prompts conversion/calibration/prompts.txt \
+            --calibration-json out/data_quant.json \
+            --max-context ${{ inputs.max_context }} \
+            --device cpu \
+            --dtype float16
+
+      - name: Verify .rkllm header
+        # rkllm 1.2.x files start with magic bytes da ee b3 36 03 00 00 00.
+        # Anything else (e.g. an HTML error page if conversion silently
+        # produced a stub) means we don't ship the artifact.
+        run: |
+          OUT="out/${{ inputs.output_basename }}_w8a8_rk3588.rkllm"
+          ls -lh "$OUT"
+          python - <<'PY'
+          import sys
+          path = "out/${{ inputs.output_basename }}_w8a8_rk3588.rkllm"
+          head = open(path, "rb").read(8).hex()
+          print("magic:", head)
+          if not head.startswith("daeeb33603000000"):
+              sys.exit(f"unexpected magic — not an rkllm 1.2.x file (got {head})")
+          PY
+
+      - name: Disk + memory after
+        if: always()
+        run: |
+          df -h /
+          free -h
+
+      - name: Upload .rkllm artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.output_basename }}-w8a8-rk3588
+          path: out/${{ inputs.output_basename }}_w8a8_rk3588.rkllm
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload calibration json (debug aid)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ inputs.output_basename }}-calibration
+          path: out/data_quant.json
+          if-no-files-found: warn
+          retention-days: 7

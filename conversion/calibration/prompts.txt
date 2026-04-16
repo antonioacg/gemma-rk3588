@@ -1,0 +1,20 @@
+What are the main differences between RAM and SSD storage?
+Write a Python function that returns the nth Fibonacci number.
+Summarize the plot of "Pride and Prejudice" in two sentences.
+Translate the following sentence into French: "The weather is beautiful today."
+A train leaves Boston at 3 PM going 60 mph and another leaves New York at 4 PM going 75 mph in the same direction. When does the second train catch up?
+Write a haiku about an autumn forest.
+Explain how a CPU pipeline differs from a CPU branch predictor.
+List five common indoor plants that are safe for cats.
+Write a SQL query that returns the top 10 customers by total order value from a table called orders(customer_id, total).
+Explain why the sky is blue, in language a curious 8-year-old would understand.
+Refactor this code so it doesn't use a global variable: counter = 0\n\ndef inc():\n    global counter\n    counter += 1
+What is the capital of Australia, and how is it different from its largest city?
+Convert 72 degrees Fahrenheit to Celsius and show the formula.
+Compose a polite email asking a colleague to reschedule a meeting from Tuesday to Thursday.
+Solve for x: 3x + 7 = 22.
+Compare the trade-offs of vector databases versus traditional relational databases for semantic search.
+Write a short ghost story set in a lighthouse, no more than 100 words.
+What is the difference between TCP and UDP, in one paragraph?
+Explain what "edge computing" means and give one practical example.
+Suggest five fun activities for a rainy weekend with two children, ages 7 and 9.

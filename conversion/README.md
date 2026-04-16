@@ -6,16 +6,21 @@ The output drops directly into the [`serving/`](../serving/) flow.
 
 ## Status
 
-Designed to run on **stock GitHub-hosted `ubuntu-latest`** (4 vCPU / 16 GB RAM /
-~21 GB free SSD after `jlumbroso/free-disk-space`, no GPU). CPU-only path is
-first-class in rkllm-toolkit for `w8a8 + normal` quantization.
+Designed and **end-to-end validated** on stock GitHub-hosted `ubuntu-latest`
+(4 vCPU / 16 GB RAM / ~21 GB free SSD after `jlumbroso/free-disk-space`,
+no GPU). CPU-only path is first-class in rkllm-toolkit for `w8a8 + normal`
+quantization.
 
-| Model | Param count | Output `.rkllm` size | Fits in `ubuntu-latest`? |
-|-------|------------:|---------------------:|--------------------------|
-| `Qwen/Qwen2.5-0.5B-Instruct` | 0.5 B | ~0.7 GB | yes (well within RAM/disk) |
-| `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | 1.1 B | ~1.1 GB | yes (RAM tight, disk fine) |
-| `google/gemma-3-1b-it` | 1.0 B | ~1.5 GB | yes (gated repo — needs `hf_token` workflow input) |
-| `google/gemma-4-e2b` (ultimate target) | ~6 B raw | ~3-4 GB | **no** — projected ~25 GB peak RAM, needs self-hosted runner or paid larger GHA runner |
+| Model | Param count | Output `.rkllm` size | Build time on ubuntu-latest | Fits? |
+|-------|------------:|---------------------:|----------------------------:|-------|
+| `Qwen/Qwen2.5-0.5B-Instruct` | 0.5 B | 799 MB | **~16 min total** (5 min deps install, 1 min HF download, 7 min calibration+quant, 30 s upload) | ✅ verified |
+| `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | 1.1 B | ~1.1 GB | likely 25-40 min | likely yes (RAM tight, disk fine) |
+| `google/gemma-3-1b-it` | 1.0 B | ~1.5 GB | likely 25-40 min | gated — pass `hf_token` workflow input |
+| `google/gemma-4-e2b` (ultimate target) | ~6 B raw | ~3-4 GB | n/a | **no** — projected ~25 GB peak RAM, needs self-hosted or paid larger runner |
+
+The Qwen2.5-0.5B output ran on the board at ~8 tok/s wall, comparable to the
+community-converted version of the same model (~9 tok/s) — within the
+expected variance from different calibration sets.
 
 ## What's here
 

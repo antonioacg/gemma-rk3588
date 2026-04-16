@@ -5,7 +5,8 @@ On-device LLM inference on Rockchip RK3588/RK3588S NPU. First target: Gemma 4 E2
 ## Status
 
 - **`serving/`** — first end-to-end spike done (2026-04-16): rkllama 0.0.66 on the Orange Pi 5 Pro serves `Qwen2.5-0.5B-Instruct` (w8a8) at ~9 tok/s over Ollama-compatible HTTP, behind a hardened systemd unit. See [`serving/README.md`](serving/README.md).
-- **`conversion/`** — TODO.
+- **`conversion/`** — first end-to-end spike done (2026-04-16): GitHub-hosted `ubuntu-latest` workflow converts a HuggingFace causal-LM to `.rkllm` w8a8 in ~16 min total. Validated by feeding the CI artifact back into the board's serving stack. See [`conversion/README.md`](conversion/README.md).
+- Whole pipeline closed: HF model id → CI conversion → `.rkllm` artifact → board → coherent tokens via `/api/generate`. Next step is graduating to the actual Gemma 4 E2B target, which will need a beefier conversion host (CI runner won't fit it).
 
 The kernel driver + DKMS + device tree work is done (see sibling repo); this repo is the userspace half. See [AGENT_PROMPT.md](AGENT_PROMPT.md) for the kickoff brief.
 
@@ -23,8 +24,12 @@ Kernel driver, device tree, DKMS, hardware bring-up — all in the sibling repo 
 
 ```
 gemma-rk3588/
-├── conversion/   # rkllm-toolkit pipeline (x86 workstation) — TODO
-└── serving/      # on-board deployment (rkllama + systemd)
+├── .github/workflows/convert.yml   # workflow_dispatch → ubuntu-latest CI conversion
+├── conversion/                     # rkllm-toolkit pipeline (x86 Linux)
+│   ├── convert.py
+│   ├── requirements.txt
+│   └── calibration/prompts.txt
+└── serving/                        # on-board deployment (rkllama + systemd)
     ├── install.sh
     ├── systemd/rkllama.service
     └── tests/e2e.sh

@@ -1,0 +1,55 @@
+[Unit]
+# Ollama-compatible HTTP server in front of librkllmrt.so on the RK3588 NPU.
+# Runs as the unprivileged user that owns the rkllama venv. Do NOT change
+# User= to root: rkllama's startup writes to /sys/class/devfreq/fdab0000.npu/*
+# when uid == 0, and that path is documented as a board-freeze trigger by the
+# antonioacg/rknpu-rk3588 driver repo.
+
+Description=rkllama (RK3588 NPU LLM HTTP server)
+Documentation=https://github.com/NotPunchnox/rkllama
+Documentation=https://github.com/antonioacg/gemma-rk3588
+After=network-online.target
+Wants=network-online.target
+# /dev/dri/renderD129 is owned by root:render and the rknpu module is loaded
+# by udev. By the time multi-user is up, the driver is ready.
+ConditionPathExists=/dev/dri/renderD129
+
+[Service]
+Type=simple
+
+# Override these in /etc/systemd/system/rkllama.service.d/override.conf if
+# the install path or username differs.
+User=antoniocasagrande
+Group=antoniocasagrande
+Environment=HOME=/home/antoniocasagrande
+WorkingDirectory=/home/antoniocasagrande/rkllama
+
+ExecStart=/home/antoniocasagrande/rkllama/.venv/bin/rkllama_server \
+    --models /home/antoniocasagrande/RKLLAMA/models \
+    --port 8080
+
+# rkllama spawns one worker process per loaded model and may keep many file
+# descriptors open. The default 1024 ulimit can pin throughput on long
+# sessions; bump it but stay well under the kernel cap.
+LimitNOFILE=8192
+
+Restart=on-failure
+RestartSec=5s
+
+# Keep the process out of capabilities it doesn't need so a future bug can't
+# accidentally trip the devfreq write guard above.
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=read-only
+# rkllama writes config.env / data/ / temp/ into its own site-packages dir
+# (poor upstream practice, but real — see rkllama config/config.py:536). The
+# venv path therefore needs to be writable.
+ReadWritePaths=/home/antoniocasagrande/RKLLAMA /home/antoniocasagrande/rkllama
+PrivateTmp=true
+
+# Belt-and-braces: even if something escalates, deny writes to the NPU
+# governor sysfs that hangs the board.
+ReadOnlyPaths=/sys/class/devfreq
+
+[Install]
+WantedBy=multi-user.target

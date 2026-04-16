@@ -4,7 +4,10 @@ On-device LLM inference on Rockchip RK3588/RK3588S NPU. First target: Gemma 4 E2
 
 ## Status
 
-**Empty scaffolding.** The kernel driver + DKMS + device tree work is done (see sibling repo); this repo is where model conversion and serving go. See [AGENT_PROMPT.md](AGENT_PROMPT.md) for the kickoff brief.
+- **`serving/`** — first end-to-end spike done (2026-04-16): rkllama 0.0.66 on the Orange Pi 5 Pro serves `Qwen2.5-0.5B-Instruct` (w8a8) at ~9 tok/s over Ollama-compatible HTTP, behind a hardened systemd unit. See [`serving/README.md`](serving/README.md).
+- **`conversion/`** — TODO.
+
+The kernel driver + DKMS + device tree work is done (see sibling repo); this repo is the userspace half. See [AGENT_PROMPT.md](AGENT_PROMPT.md) for the kickoff brief.
 
 ## What this repo is
 
@@ -16,14 +19,15 @@ On-device LLM inference on Rockchip RK3588/RK3588S NPU. First target: Gemma 4 E2
 
 Kernel driver, device tree, DKMS, hardware bring-up — all in the sibling repo [antonioacg/rknpu-rk3588](https://github.com/antonioacg/rknpu-rk3588). This repo assumes the driver is installed (`/dev/dri/renderD129` present, `rknpu 0.9.8` loaded). See the rknpu-rk3588 Quick Start to set that up first.
 
-## Planned layout
+## Layout
 
 ```
 gemma-rk3588/
-├── conversion/   # rkllm-toolkit pipeline (x86 workstation)
-├── serving/      # on-board deployment (rkllama + systemd)
-├── tests/        # end-to-end prompt→response checks
-└── docs/         # deployment playbook, troubleshooting
+├── conversion/   # rkllm-toolkit pipeline (x86 workstation) — TODO
+└── serving/      # on-board deployment (rkllama + systemd)
+    ├── install.sh
+    ├── systemd/rkllama.service
+    └── tests/e2e.sh
 ```
 
 Each subdirectory grows its own README as it materializes.
